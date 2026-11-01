@@ -8,6 +8,8 @@
 #   base                push base, then koreader  (skip crengine)
 #   koreader            push koreader only
 #   --dry-run           show what would be pushed without doing anything
+#
+# PUSH_REMOTE defaults to origin; set PUSH_REMOTE=mytky to publish upstream.
 
 set -euo pipefail
 
@@ -31,6 +33,7 @@ die() {
 
 DRY=false
 START="crengine"
+PUSH_REMOTE="${PUSH_REMOTE:-origin}"
 
 for arg in "$@"; do
     case "${arg}" in
@@ -64,7 +67,7 @@ show_ahead() {
 # Prints the pushed SHA on stdout — all other output is routed to stderr so
 # the caller's `$(...)` capture only sees the SHA.
 push_onto_remote_master() {
-    local dir="$1" remote="$2" sub_path="${3:-}" sub_sha="${4:-}"
+    local dir="$1" remote="$2" push_remote="$3" sub_path="${4:-}" sub_sha="${5:-}"
 
     # Run internal commands with stdout silenced (>/dev/null) where the
     # output would otherwise leak into our `echo "$pushed_sha"` return.
@@ -162,7 +165,7 @@ push_onto_remote_master() {
         fi
     fi
 
-    git -C "${dir}" push -q "${remote}" "_push_tmp:master" >/dev/null 2>&1
+    git -C "${dir}" push -q "${push_remote}" "_push_tmp:master" >/dev/null 2>&1
     local pushed_sha
     pushed_sha=$(git -C "${dir}" rev-parse HEAD)
 
@@ -176,15 +179,15 @@ push_onto_remote_master() {
 
 if ${DRY}; then
     if [[ "${START}" == "crengine" ]]; then
-        info "crengine (mytky → master):"
-        show_ahead "${CRENGINE_DIR}" mytky
+        info "crengine (${PUSH_REMOTE}/master):"
+        show_ahead "${CRENGINE_DIR}" "${PUSH_REMOTE}"
     fi
     if [[ "${START}" != "koreader" ]]; then
-        info "koreader-base (mytky → master):"
-        show_ahead "${BASE_DIR}" mytky
+        info "koreader-base (${PUSH_REMOTE}/master):"
+        show_ahead "${BASE_DIR}" "${PUSH_REMOTE}"
     fi
-    info "koreader-tategumi (origin → master):"
-    show_ahead "${ROOT}" origin
+    info "koreader-tategumi (${PUSH_REMOTE}/master):"
+    show_ahead "${ROOT}" "${PUSH_REMOTE}"
     exit 0
 fi
 
@@ -195,20 +198,20 @@ base_sha=""
 
 if [[ "${START}" == "crengine" ]]; then
     info "Pushing crengine…"
-    crengine_sha=$(push_onto_remote_master "${CRENGINE_DIR}" mytky)
+    crengine_sha=$(push_onto_remote_master "${CRENGINE_DIR}" "${PUSH_REMOTE}" "${PUSH_REMOTE}")
     info "  → ${crengine_sha}"
 fi
 
 if [[ "${START}" != "koreader" ]]; then
     info "Pushing koreader-base…"
-    base_sha=$(push_onto_remote_master "${BASE_DIR}" mytky \
+    base_sha=$(push_onto_remote_master "${BASE_DIR}" "${PUSH_REMOTE}" "${PUSH_REMOTE}" \
         "thirdparty/kpvcrlib/crengine" "${crengine_sha}")
     info "  → ${base_sha}"
 fi
 
 info "Pushing koreader-tategumi…"
-push_onto_remote_master "${ROOT}" origin "base" "${base_sha}" >/dev/null
-local_sha=$(git -C "${ROOT}" rev-parse origin/master)
+push_onto_remote_master "${ROOT}" "${PUSH_REMOTE}" "${PUSH_REMOTE}" "base" "${base_sha}" >/dev/null
+local_sha=$(git -C "${ROOT}" rev-parse HEAD)
 info "  → ${local_sha}"
 
 info "Done."

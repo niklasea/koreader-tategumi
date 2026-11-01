@@ -22,6 +22,7 @@ describe("Vertical text: Chinese profile #vertical_zh_profile", function()
 
     after_each(function()
         if reader then
+            reader.document:setTextMainLang("en")
             reader:onClose()
             reader = nil
         end
@@ -62,7 +63,7 @@ describe("Vertical text: Chinese profile #vertical_zh_profile", function()
         return boxes[1]
     end
 
-    it("accepts -ms-writing-mode and -epub-text-orientation aliases", function()
+    it("accepts the legacy -ms-writing-mode alias", function()
         local doc = open_html([[<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-TW"><head><style>
 html, body { margin: 0; padding: 0; }
@@ -80,6 +81,7 @@ html, body { margin: 0; padding: 0; }
 html, body { writing-mode: vertical-rl; }
 p { margin: 0; font-size: 32px; }
 </style></head><body><p>甲。乙</p></body></html>]], "zh-TW")
+        local font_size = doc:getFontSize()
         local zh_height = char_box(doc, "。").h
 
         reader:onClose()
@@ -96,8 +98,10 @@ html, body { writing-mode: vertical-rl; }
 p { margin: 0; font-size: 32px; }
 </style></head><body><p>甲。乙</p></body></html>]], "ja")
         local ja_height = char_box(doc, "。").h
-        print(string.format("[vertical_zh_profile] Chinese 。 slot=%d, Japanese 。 slot=%d",
-            zh_height, ja_height))
+        assert.is_true(zh_height >= font_size - 2,
+            "Chinese punctuation must fill the em slot")
+        assert.is_true(ja_height <= font_size / 2 + 2,
+            "Japanese punctuation control must use the half-em slot")
         assert.is_true(zh_height > ja_height,
             "Chinese punctuation must not use the Japanese half-em slot")
     end)
